@@ -1,0 +1,242 @@
+import numpy as np
+from tkinter import *
+from tkinter import messagebox
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
+from PIL import ImageTk, Image
+
+#main window
+screen= Tk()
+
+# Set the size of the window
+window_width = 800
+window_height = 600
+screen.geometry(f"{window_width}x{window_height}")
+
+# Center the window on the screen
+screen_width = screen.winfo_screenwidth()
+screen_height = screen.winfo_screenheight()
+x = int((screen_width - window_width) / 2)
+y = int((screen_height - window_height) / 2)
+screen.geometry(f"+{x}+{y}")
+screen.configure(bg='black')
+screen.resizable(False, False)
+
+# Load image file and create PhotoImage object
+img = Image.open("ani.png")
+photo = ImageTk.PhotoImage(img)
+
+# Set window icon using wm_iconphoto() method
+screen.wm_iconphoto(True, photo)
+screen.title("Black Hole Simulator")
+
+#bg
+bg_image = PhotoImage(file="hi.png")
+bg_label = Label(screen, image=bg_image)
+bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+
+#window title                   
+lblTitle=Label(text="Simulate a Black Hole", font=("Roboto", 45,'bold'), fg="white", bg="Black")
+lblTitle.pack(padx=50, pady=10)
+
+#parameters IntVar        
+num_dots=IntVar()
+galaxy_radius = IntVar()
+bh_mass = IntVar()
+bh_posx = IntVar()
+bh_posy = IntVar()
+bh_velx = IntVar()
+bh_vely = IntVar()
+
+#run simulation
+def run_simulation():
+
+    # Get the current parameter values
+    num_dots_val = num_dots.get()
+    galaxy_radius_val = galaxy_radius.get()
+    bh_mass_val = bh_mass.get()
+    bh_posx_val = bh_posx.get()
+    bh_posy_val = bh_posy.get()
+    bh_velx_val = bh_velx.get()
+    bh_vely_val = bh_vely.get()
+    
+    # Check that the parameter values are valid
+    if num_dots_val <= 0:
+        messagebox.showerror("Error", "Number of dots must be positive!")
+        return
+    elif galaxy_radius_val <= 0:
+        messagebox.showerror("Error", "Galaxy radius must be positive!")
+        return
+    elif bh_mass_val <= 0:
+        messagebox.showerror("Error", "Black hole mass must be positive!")
+        return
+    elif bh_posx_val < -galaxy_radius_val or bh_posx_val > galaxy_radius_val:
+        messagebox.showerror("Error", "Black hole X position must be within the galaxy bounds!")
+        return
+    elif bh_posy_val < -galaxy_radius_val or bh_posy_val > galaxy_radius_val:
+        messagebox.showerror("Error", "Black hole Y position must be within the galaxy bounds1")
+        return
+    
+    screen.withdraw()
+    
+    # second window for simulation
+    plot_screen = Tk()
+        
+    # Set the size of the window
+    window_width = 1000
+    window_height = 600
+    plot_screen.geometry(f"{window_width}x{window_height}")
+
+    # Center the window on the screen
+    screen_width = plot_screen.winfo_screenwidth()
+    screen_height = plot_screen.winfo_screenheight()
+    x = int((screen_width - window_width) / 2)
+    y = int((screen_height - window_height) / 2)
+    plot_screen.geometry(f"+{x}+{y}")
+    plot_screen.configure(bg='black')
+    plot_screen.resizable(False, False)
+    plot_screen.title("Black Hole Plot Animation")
+    
+    # Define the initial positions of the dots and the black hole
+    galaxy_pos = galaxy_radius.get() * (2 * np.random.rand(num_dots.get(), 2) - 1)
+    bh_pos = np.array([bh_posx.get(), bh_posy.get()])
+    bh_vel = np.array([bh_velx.get(), bh_vely.get()])
+
+    # Set up the figure for the animation
+    fig = plt.figure(figsize=(10, 6), dpi=100)
+    
+    # Define the function to update the position of the dots
+    def update_pos(frame):
+        global plot_screen, animation_running, canvas
+    
+        # Calculate the acceleration of the dots due to the black hole
+        r = np.sqrt(np.sum((galaxy_pos - bh_pos)**2, axis=1))
+        a = -bh_mass.get() * (galaxy_pos - bh_pos) / r[:, np.newaxis]**3
+
+        # Update the velocity and position of the dots
+        galaxy_pos[:, 0] += a[:, 0]
+        galaxy_pos[:, 1] += a[:, 1]
+
+        # Update the position of the black hole
+        bh_pos[0] += bh_vel[0]
+        bh_pos[1] += bh_vel[1]
+
+        # Plot the new positions of the dots and the black hole
+        plt.clf()
+        plt.style.use('dark_background')
+        fig.patch.set_facecolor('black')
+        sample_size = int(len(galaxy_pos) * 0.1)
+        sample_indices = np.random.choice(range(len(galaxy_pos)), sample_size, replace=False)
+        plt.scatter(galaxy_pos[sample_indices, 0], galaxy_pos[sample_indices, 1], s=1, marker='o', color='white', label='Celestial Bodies')
+        plt.scatter(bh_pos[0], bh_pos[1], s=150, color='red', label='Black Hole')
+
+        # Set title and labels for the axes
+        plt.title('Simulation of a Black Hole')
+        plt.xlabel('X Position')
+        plt.ylabel('Y Position')
+
+        # Use the integer value in xlim and ylim
+        plt.xlim(-galaxy_radius_val, galaxy_radius_val)
+        plt.ylim(-galaxy_radius_val, galaxy_radius_val)
+        # Add a legend
+        plt.legend(loc='lower right', bbox_to_anchor=(1, 1), borderaxespad=0, fontsize='medium')
+       
+       # Check if the animation is running
+        if animation.event_source is None:
+            canvas.draw()
+            animation_running = False 
+        
+    # Create an animation object with the `animation.FuncAnimation` function
+    animation = FuncAnimation(fig, update_pos, frames=range(200), blit=False, interval=50, repeat=False)
+   
+    # Set up the canvas to display the animation in the Tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=plot_screen)
+    canvas.get_tk_widget().place(x=0, y=0, width=window_width, height=window_height-40)
+
+    # Add a toolbar to the canvas
+    toolbar = NavigationToolbar2Tk(canvas, plot_screen,)
+    toolbar.update()
+    toolbar.place(x=0, y=560, width=1000, height=40)
+  
+    #quit function
+    def close_window():
+        if messagebox.askyesno(title='Quit', message='Are you sure you want to quit?'):
+            if canvas.get_tk_widget() is not None:
+                canvas.get_tk_widget().destroy()
+            if plot_screen is not None:
+                plot_screen.destroy()
+            plt.close('all')
+            if screen is not None:
+                screen.quit()
+            
+    def go_back():
+        global animation_running
+        if animation.event_source is not None:
+            messagebox.showinfo(title='Simulation Running', message='Please wait for the simulation to finish before going back to the main menu.')
+        else:
+            canvas.get_tk_widget().destroy()
+            plot_screen.destroy()
+            screen.deiconify()
+
+    #quit button
+    quit_button = Button(plot_screen, text='Quit', font=("arial", 10, "bold"),bg="#ed3833", bd=3, command=close_window)
+    quit_button.place(x=923, y=440, width=60, height=60)
+    
+    #back button    
+    back_button = Button(plot_screen, text='Back', font=("arial", 10, "bold"), bg="#1089ff", bd=3, command=go_back)
+    back_button.place(x=923, y=370, width=60, height=60)
+    
+    #loop the second window
+    plot_screen.mainloop()
+    
+#reset function   
+def reset():
+    
+    # Reset the parameters to their default values
+    num_dots.set(0)
+    galaxy_radius.set(0)
+    bh_mass.set(0)
+    bh_posx.set(0)
+    bh_posy.set(0)
+    bh_velx.set(0)
+    bh_vely.set(0)
+    
+#parameters labels    
+Label(screen, text="Number of Dots:",font=("arial", 18, "bold"), bg="black", bd=5, fg="white").place(x=180, y=100)
+Label(screen, text="Galaxy Radius:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=150)
+Label(screen, text="Black Hole Mass:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=200)
+Label(screen, text="Black Hole Pos X:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=250)
+Label(screen, text="Black Hole Pos Y:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=300)
+Label(screen, text="Black Hole Vel X:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=350)
+Label(screen, text="Black Hole Vel Y:",font=("arial", 18, "bold"), bg="black", fg="white").place(x=180, y=400)
+
+#parameters entry
+entry_num_dots=Entry(screen,textvariable=num_dots, width=12, bd=3, font=("arial", 20))
+entry_galaxy_radius=Entry(screen, textvariable=galaxy_radius, width=12, bd=3, font=("arial", 20))
+entry_bh_mass=Entry(screen, textvariable=bh_mass, width=12, bd=3, font=("arial", 20))
+entry_bh_posx=Entry(screen, textvariable=bh_posx, width=12, bd=3, font=("arial", 20))
+entry_bh_posy=Entry(screen, textvariable=bh_posy, width=12, bd=3, font=("arial", 20))
+entry_bh_velx=Entry(screen, textvariable=bh_velx, width=12, bd=3, font=("arial", 20))
+entry_bh_vely=Entry(screen, textvariable=bh_vely, width=12, bd=3, font=("arial", 20))
+
+#parameters place
+entry_num_dots.place(x=450, y=100)
+entry_galaxy_radius.place(x=450, y=150)
+entry_bh_mass.place(x=450, y=200)
+entry_bh_posx.place(x=450, y=250)
+entry_bh_posy.place(x=450, y=300)
+entry_bh_velx.place(x=450, y=350)
+entry_bh_vely.place(x=450, y=400)
+
+#screen window buttons
+Button(screen, text="Simulate", height="2", width=23, bg="#00bd56", fg="white", bd=5,command=run_simulation ).place(x=110, y=475)
+Button(screen, text="Reset", height="2", width=23, bg="#1089ff", fg="white", bd=5, command=reset ).place(x=310, y=475)
+Button(screen, text="Exit", height="2", width=23, bg="#ed3833", fg="white", bd=5, command=screen.quit).place(x=510, y=475)
+        
+#loop the first window    
+screen.mainloop()
+
+            
+    
+    
